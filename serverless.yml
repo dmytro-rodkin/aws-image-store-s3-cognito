@@ -1,0 +1,172 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: task-aws-image
+# app and org for use with dashboard.serverless.com
+#app: your-app-name
+#org: your-org-name
+
+# You can pin your service to only deploy with a specific Serverless version
+# Check out our docs for more details
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  region: eu-central-1
+  environment:
+    user_pool_id: { Ref: UserPool }
+    client_id: { Ref: UserClient }
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - cognito-idp:AdminInitiateAuth
+        - cognito-idp:AdminCreateUser
+        - cognito-idp:AdminSetUserPassword
+      Resource: "*"
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+        - s3:PutObject
+        - s3:PutObjectAcl
+        - s3:DeleteObject
+        - s3:PostObject
+      Resource:
+        # concatenate the following strings
+        Fn::Join:
+          - ""
+          - - "arn:aws:s3:::"
+            - "aws-image-s3-bucket"
+            # "*" used as a wildcard means "any files"
+            - "/*"
+    - Effect: Allow
+      Action:
+        - s3:ListBucket
+      Resource:
+        Fn::Join:
+          - ""
+          - - "arn:aws:s3:::"
+            - "aws-image-s3-bucket"
+
+functions:
+  loginUser:
+    handler: src/routes/login.login
+    events:
+      - http:
+          path: user/login
+          method: post
+          cors: true
+
+  signupUser:
+    handler: src/routes/signup.signup
+    events:
+      - http:
+          path: user/signup
+          method: post
+          cors: true
+
+  showPhotos:
+    handler: src/routes/photos.showphotos
+    events:
+      - http:
+          path: user/photos/all
+          method: get
+          cors: true
+          authorizer:
+            name: PrivateAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - UserPool
+                - Arn
+            claims:
+              - email
+
+  addPhotoPresigned:
+    handler: src/routes/photos.addphotopresigned
+    events:
+      - http:
+          path: user/photos
+          method: get
+          cors: true
+          authorizer:
+            name: PrivateAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - UserPool
+                - Arn
+            claims:
+              - email
+
+  deletePhoto:
+    handler: src/routes/photos.deletephotos
+    events:
+      - http:
+          path: user/photos/{uuid}
+          method: delete
+          cors: true
+          authorizer:
+            name: PrivateAuthorizer
+            type: COGNITO_USER_POOLS
+            arn:
+              Fn::GetAtt:
+                - UserPool
+                - Arn
+            claims:
+              - email
+  # addPhoto:
+  #   handler: src/routes/photos.addphoto
+  #   events:
+  #     - http:
+  #         path: user/photos
+  #         method: post
+  #         cors: true
+  #         authorizer:
+  #           name: PrivateAuthorizer
+  #           type: COGNITO_USER_POOLS
+  #           arn:
+  #             Fn::GetAtt:
+  #               - UserPool
+  #               - Arn
+  #           claims:
+  #             - email
+
+resources:
+  Resources:
+    UserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: serverless-auth-pool
+        Schema:
+          - Name: email
+            Required: true
+            Mutable: true
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 6
+        AutoVerifiedAttributes: ["email"]
+
+    UserClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: user-pool-ui
+        GenerateSecret: false
+        UserPoolId: { Ref: UserPool }
+        AccessTokenValidity: 5
+        IdTokenValidity: 5
+        ExplicitAuthFlows:
+          - "ADMIN_NO_SRP_AUTH"
+
+plugins:
+  - serverless-plugin-typescript
