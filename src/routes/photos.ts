@@ -8,7 +8,7 @@ import { v4 as uuid } from "uuid";
 
 const cognito = new AWS.CognitoIdentityServiceProvider();
 const s3 = new AWS.S3();
-AWS.config.update({ accessKeyId: "AKIAUYSFSKNNM2HWHG5J", secretAccessKey: "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" });
+//AWS.config.update({ accessKeyId: "AKIAUYSFSKNNM2HWHG5J", secretAccessKey: "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" });
 
 const bucketname = "aws-image-s3-bucket"; //process.env.bucketname;
 
@@ -45,7 +45,7 @@ export const addphotopresigned = async (event: APIGatewayProxyEvent): Promise<AP
       Conditions: [
         ["content-length-range", 0, 1000000], // content length restrictions: 0-1MB
         //["starts-with", "$Content-Type", "image/"], // content type restriction
-        //["eq", "$x-amz-meta-userid", photoid],
+        ["starts-with", "$x-amz-meta-photoname", ""],
         //{ acl: "public-read" },
       ],
     });
@@ -69,14 +69,28 @@ export const showphotos = async (event: APIGatewayProxyEvent): Promise<APIGatewa
     const signedUrlExpireSeconds = 60 * 5;
     console.log(objects);
     const keysArray = objects.Contents?.filter((elem, index) => elem.Key?.split("/")[1] != "").map((elem) => elem.Key);
-    const outArray = keysArray?.map((elem) => {
-      const url = s3.getSignedUrl("getObject", {
-        Bucket: <string>bucketname,
-        Key: elem,
-        Expires: signedUrlExpireSeconds,
-      });
-      return { fileName: elem?.split("/")[1], url };
-    });
+    if (typeof keysArray === "undefined") {
+      throw new Error("No photos found");
+    }
+    const outArray = await Promise.all(
+      keysArray.map(async (elem) => {
+        const url = s3.getSignedUrl("getObject", {
+          Bucket: <string>bucketname,
+          Key: elem,
+          Expires: signedUrlExpireSeconds,
+        });
+        const photoName = await s3
+          .headObject({
+            Bucket: <string>bucketname,
+            Key: <string>elem,
+          })
+          .promise();
+        const photoNameString = photoName?.Metadata?.photoname || "";
+        // ObjectAttributes: ETag | Checksum | ObjectParts | StorageClass | ObjectSize | metaInfo})
+
+        return { fileName: elem?.split("/")[1], photoName: photoNameString, url };
+      }),
+    );
 
     return sendResponse(200, { data: outArray });
   } catch (error) {
