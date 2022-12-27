@@ -2,40 +2,43 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import AWS from "aws-sdk";
 import { AdminInitiateAuthRequest } from "aws-sdk/clients/cognitoidentityserviceprovider";
 
-import { validateInput, sendResponse } from "../functions/functions";
+import { sendResponse } from "../functions/functions";
 
 const cognito = new AWS.CognitoIdentityServiceProvider();
 
-export const login = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+export const refresh = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
     if (event.body == null) {
-      throw Error("no body");
+      throw Error("no refresh token");
     }
-    const isValid = validateInput(event.body);
+    const isValid = validateRefreshTokenInput(event.body);
     if (!isValid) return sendResponse(400, { message: "Invalid input" });
 
-    const { email, password } = JSON.parse(event.body);
+    const { refreshToken } = JSON.parse(event.body);
     const { user_pool_id, client_id } = process.env;
     const params = {
-      AuthFlow: "ADMIN_NO_SRP_AUTH",
+      AuthFlow: "REFRESH_TOKEN_AUTH",
       UserPoolId: user_pool_id,
       ClientId: client_id,
       AuthParameters: {
-        USERNAME: email,
-        PASSWORD: password,
+        REFRESH_TOKEN: refreshToken,
       },
     };
     const response = await cognito.adminInitiateAuth(<AdminInitiateAuthRequest>params).promise();
-    // if (typeof response === "undefined") {
-    //   throw Error("Response undefined");
-    // }
+
     return sendResponse(200, {
       message: "Success",
-      idToken: response?.AuthenticationResult?.IdToken,
-      //accessToken: response?.AuthenticationResult?.
-      refreshToken: response?.AuthenticationResult?.RefreshToken,
+      idToken: response.AuthenticationResult?.IdToken,
+      //accessToken: response.AuthenticationResult?.AccessToken,
     });
   } catch (error) {
     return sendResponse(500, { error });
   }
+};
+
+const validateRefreshTokenInput = (data: string) => {
+  const body = JSON.parse(data);
+  const { refreshToken } = body;
+  if (!refreshToken) return false;
+  return true;
 };

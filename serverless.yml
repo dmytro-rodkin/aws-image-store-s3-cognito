@@ -66,7 +66,13 @@ functions:
           path: user/login
           method: post
           cors: true
-
+  refreshUser:
+    handler: src/routes/refresh.refresh
+    events:
+      - http:
+          path: user/refresh
+          method: post
+          cors: true
   signupUser:
     handler: src/routes/signup.signup
     events:
@@ -125,22 +131,6 @@ functions:
                 - Arn
             claims:
               - email
-  # addPhoto:
-  #   handler: src/routes/photos.addphoto
-  #   events:
-  #     - http:
-  #         path: user/photos
-  #         method: post
-  #         cors: true
-  #         authorizer:
-  #           name: PrivateAuthorizer
-  #           type: COGNITO_USER_POOLS
-  #           arn:
-  #             Fn::GetAtt:
-  #               - UserPool
-  #               - Arn
-  #           claims:
-  #             - email
 
 resources:
   Resources:

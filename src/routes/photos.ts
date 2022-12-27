@@ -12,22 +12,10 @@ const s3 = new AWS.S3();
 
 const bucketname = "aws-image-s3-bucket"; //process.env.bucketname;
 
-export const getphotos = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  // if (event == null)
-  // return sendResponse(500, {message: event is null});
-  // else
-  try {
-    const data = extractEmailFromToken(event);
-    if (data.code == 0) throw Error("Email is not extracted");
-    const { email } = data;
-
-    return sendResponse(200, { message: "Done!" });
-  } catch (error) {
-    return sendResponse(200, { message: error });
-  }
-
-  // to do
-};
+interface emailExrtactor {
+  code: number;
+  email: string;
+}
 
 export const addphotopresigned = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
@@ -68,10 +56,12 @@ export const showphotos = async (event: APIGatewayProxyEvent): Promise<APIGatewa
       .promise();
     const signedUrlExpireSeconds = 60 * 5;
     console.log(objects);
+
     const keysArray = objects.Contents?.filter((elem, index) => elem.Key?.split("/")[1] != "").map((elem) => elem.Key);
     if (typeof keysArray === "undefined") {
       throw new Error("No photos found");
     }
+
     const outArray = await Promise.all(
       keysArray.map(async (elem) => {
         const url = s3.getSignedUrl("getObject", {
@@ -94,7 +84,7 @@ export const showphotos = async (event: APIGatewayProxyEvent): Promise<APIGatewa
 
     return sendResponse(200, { data: outArray });
   } catch (error) {
-    return sendResponse(200, { message: error });
+    return sendResponse(400, { message: error });
   }
 };
 
@@ -110,43 +100,9 @@ export const deletephotos = async (event: APIGatewayProxyEvent): Promise<APIGate
     await s3.deleteObject({ Bucket: <string>bucketname, Key: createKey(emailHashed, uuid) }).promise();
     return sendResponse(200, { info: "Object deleted" });
   } catch (error) {
-    return sendResponse(200, { message: error });
+    return sendResponse(400, { message: error });
   }
 };
-// export const addphoto = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-//   try {
-//     const data = extractEmailFromToken(event);
-//     if (data.code == 0) throw Error("Email is not extracted");
-//     const { email } = data;
-//     const emailHashed = hash(email);
-//     const params = {
-//       Bucket: process.env.BUCKETNAME,
-//       Fields: {
-//         key: emailHashed + "/" + uuid(), // totally random
-//       },
-//       Conditions: [
-//         ["content-length-range", 0, 1000000], // content length restrictions: 0-1MB
-//         ["starts-with", "$Content-Type", "image/"], // content type restriction
-//       ],
-//     };
-
-//     return sendResponse(200, params);
-//   } catch (error) {
-//     return sendResponse(200, { message: error });
-//   }
-// };
-
-/*
-  post user/login body {email, pass} -> logins user ->gives token back
-  post user/signup body {email, pass} -> registers user
-  get user/photo header {token} -> gives list of photos with urls -> {status, data: [{name, url},...]}
-  post user/photo header {token} -> uploads new photo -> {status, url}
-  delete user/photo header {token} body{url(or part of it)} -> deletes photo -> {status, message}
-*/
-interface emailExrtactor {
-  code: number;
-  email: string;
-}
 
 const extractEmailFromToken = (event: APIGatewayProxyEvent): emailExrtactor => {
   try {
