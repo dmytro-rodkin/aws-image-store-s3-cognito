@@ -3,14 +3,11 @@ import AWS from "aws-sdk";
 import { validateInput, sendResponse } from "../functions/functions";
 import hash from "object-hash";
 import { v4 as uuid } from "uuid";
-// import * as dotenv from "dotenv";
-// dotenv.config();
 
 const cognito = new AWS.CognitoIdentityServiceProvider();
 const s3 = new AWS.S3();
-//AWS.config.update({ accessKeyId: "AKIAUYSFSKNNM2HWHG5J", secretAccessKey: "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" });
 
-const bucketname = "aws-image-s3-bucket"; //process.env.bucketname;
+const bucketname = "aws-image-s3-bucket";
 
 interface emailExrtactor {
   code: number;
@@ -31,13 +28,10 @@ export const addphotopresigned = async (event: APIGatewayProxyEvent): Promise<AP
       },
       Expires: 600,
       Conditions: [
-        ["content-length-range", 0, 1000000], // content length restrictions: 0-1MB
-        //["starts-with", "$Content-Type", "image/"], // content type restriction
+        ["content-length-range", 0, 1000000],
         ["starts-with", "$x-amz-meta-photoname", ""],
-        //{ acl: "public-read" },
       ],
     });
-    //params.fields["x-amz-meta-userid"] = photoid;
 
     return sendResponse(200, params);
   } catch (error) {
@@ -76,7 +70,6 @@ export const showphotos = async (event: APIGatewayProxyEvent): Promise<APIGatewa
           })
           .promise();
         const photoNameString = photoName?.Metadata?.photoname || "";
-        // ObjectAttributes: ETag | Checksum | ObjectParts | StorageClass | ObjectSize | metaInfo})
 
         return { fileName: elem?.split("/")[1], photoName: photoNameString, url };
       }),
@@ -115,7 +108,6 @@ const extractEmailFromToken = (event: APIGatewayProxyEvent): emailExrtactor => {
 const getUUID = (event: APIGatewayProxyEvent): string => {
   const uuid = event.pathParameters!["uuid"];
 
-  // if uuid is non-existent throws HTTP error - bad request
   if (!uuid) {
     throw new Error("Missing UUID");
   }
@@ -127,7 +119,6 @@ const createKey = (emailHashed: string, uuid: string): string => {
   try {
     return emailHashed + "/" + uuid + ".jpg";
   } catch (e) {
-    // if head object fails we check for the error code
     throw new Error("user not found");
   }
 };
@@ -137,7 +128,6 @@ const validatePhotoExists = async (emailHashed: string, uuid: string): Promise<v
     const key = createKey(emailHashed, uuid);
     await s3.headObject({ Bucket: bucketname, Key: key }).promise();
   } catch (e) {
-    // if head object fails we check for the error code
     throw new Error("user not found");
   }
 };
